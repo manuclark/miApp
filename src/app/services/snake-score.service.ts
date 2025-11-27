@@ -14,7 +14,7 @@ export interface SnakeScore {
   providedIn: 'root'
 })
 export class SnakeScoreService {
-  private apiUrl = 'http://localhost:8000/api/snake-scores';
+  private apiUrl = '/api/snake-scores';
 
   constructor(private http: HttpClient) { }
 
