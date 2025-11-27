@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import pyodbc
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 
@@ -19,6 +21,10 @@ PASSWORD_DB = os.getenv("PASSWORD_DB")
 DATABASE_NAME = os.getenv("DATABASE_NAME", "master")
 PORT_DB = os.getenv("PORT_DB", "1433")
 DRIVER = os.getenv("DRIVER", "{ODBC Driver 18 for SQL Server}")
+
+# Configurar rutas
+BASE_DIR = Path(__file__).resolve().parent.parent
+WWW_DIR = BASE_DIR / "www"
 
 
 def get_db_connection_string():
@@ -78,11 +84,15 @@ app = FastAPI(
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8100", "http://localhost:4200"],  # Ionic y Angular dev servers
+    allow_origins=["*"],  # Permitir todos los orígenes en producción
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Montar archivos estáticos del frontend Angular
+if WWW_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(WWW_DIR / "assets")), name="assets")
 
 
 # ============================================================
@@ -101,18 +111,28 @@ class SnakeScoreResponse(BaseModel):
     CreatedAt: str
 
 
-@app.get("/")
-async def root():
-    """Endpoint raíz"""
+@app.get("/api")
+async def api_root():
+    """Endpoint raíz de la API"""
     return {
         "message": "Bienvenido a miApp API",
         "version": "1.0.0",
         "endpoints": {
             "health": "/health",
             "docs": "/docs",
-            "redoc": "/redoc"
+            "redoc": "/redoc",
+            "api": "/api"
         }
     }
+
+
+@app.get("/")
+async def serve_spa():
+    """Servir el frontend Angular"""
+    index_file = WWW_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    return {"message": "Frontend no encontrado. Asegúrate de compilar la aplicación Angular."}
 
 
 @app.get("/health")
@@ -281,6 +301,25 @@ async def get_player_scores(player_name: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener los scores del jugador: {str(e)}")
+
+
+@app.get("/{full_path:path}")
+async def serve_static_or_spa(full_path: str):
+    """
+    Servir archivos estáticos o el SPA para rutas no encontradas.
+    Esto permite que Angular maneje las rutas del frontend.
+    """
+    # Intentar servir archivo estático
+    file_path = WWW_DIR / full_path
+    if file_path.is_file():
+        return FileResponse(str(file_path))
+    
+    # Si no es un archivo, servir index.html para que Angular maneje la ruta
+    index_file = WWW_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    
+    raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
 
 if __name__ == "__main__":

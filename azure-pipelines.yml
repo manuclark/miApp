@@ -1,0 +1,100 @@
+# Pipeline de Azure DevOps para despliegue a Azure Web App
+
+trigger:
+  branches:
+    include:
+    - master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Estas variables se deben configurar en Azure DevOps como variables secretas
+  # Pipeline → Edit → Variables → New variable
+  - name: azureSubscription
+    value: 'YOUR_AZURE_SERVICE_CONNECTION'
+  - name: webAppName
+    value: 'miapp-serpiente-game'
+  - name: resourceGroupName
+    value: 'RG-MANU'
+
+stages:
+- stage: Build
+  displayName: 'Build Application'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build Frontend and Backend'
+    steps:
+    - checkout: self
+    
+    # Configurar Node.js para Angular/Ionic
+    - task: NodeTool@0
+      displayName: 'Instalar Node.js'
+      inputs:
+        versionSpec: '20.x'
+    
+    # Instalar dependencias de Node
+    - script: npm ci
+      displayName: 'Instalar dependencias de Node'
+    
+    # Compilar aplicación Angular
+    - script: npm run build -- --configuration production
+      displayName: 'Compilar aplicación Angular'
+    
+    # Configurar Python
+    - task: UsePythonVersion@0
+      displayName: 'Configurar Python'
+      inputs:
+        versionSpec: '3.11'
+    
+    # Instalar dependencias de Python
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: 'Instalar dependencias de Python'
+    
+    # Crear archivo .env con variables de entorno
+    - script: |
+        echo "HOST_DB=$(HOST_DB)" > app/.env
+        echo "ADMIN_DB=$(ADMIN_DB)" >> app/.env
+        echo "PASSWORD_DB=$(PASSWORD_DB)" >> app/.env
+        echo "DATABASE_NAME=$(DATABASE_NAME)" >> app/.env
+        echo "PORT_DB=$(PORT_DB)" >> app/.env
+        echo "DRIVER=$(DRIVER)" >> app/.env
+      displayName: 'Crear archivo .env'
+      env:
+        HOST_DB: $(HOST_DB)
+        ADMIN_DB: $(ADMIN_DB)
+        PASSWORD_DB: $(PASSWORD_DB)
+        DATABASE_NAME: $(DATABASE_NAME)
+        PORT_DB: $(PORT_DB)
+        DRIVER: $(DRIVER)
+    
+    # Publicar artefactos
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publicar artefactos'
+      inputs:
+        PathtoPublish: '$(System.DefaultWorkingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+- stage: Deploy
+  displayName: 'Deploy to Azure'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployWeb
+    displayName: 'Desplegar a Azure Web App'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebApp@1
+            displayName: 'Desplegar a Azure Web App'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              appType: 'webAppLinux'
+              appName: '$(webAppName)'
+              package: '$(Pipeline.Workspace)/drop'
+              runtimeStack: 'PYTHON|3.11'
