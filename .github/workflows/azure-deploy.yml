@@ -48,29 +48,6 @@ jobs:
         echo "PORT_DB=${{ secrets.PORT_DB }}" >> deploy_package/app/.env
         echo "DRIVER=${{ secrets.DRIVER }}" >> deploy_package/app/.env
 
-    - name: Create web.config for Azure Windows
-      run: |
-        cat > deploy_package/web.config << 'EOF'
-        <?xml version="1.0" encoding="utf-8"?>
-        <configuration>
-          <system.webServer>
-            <handlers>
-              <add name="PythonHandler" path="*" verb="*" modules="httpPlatformHandler" resourceType="Unspecified"/>
-            </handlers>
-            <httpPlatform processPath="D:\home\python\python.exe"
-                          arguments="D:\home\site\wwwroot\app\main.py"
-                          stdoutLogEnabled="true"
-                          stdoutLogFile="D:\home\LogFiles\python.log"
-                          startupTimeLimit="60"
-                          processesPerApplication="1">
-              <environmentVariables>
-                <environmentVariable name="PORT" value="%HTTP_PLATFORM_PORT%" />
-              </environmentVariables>
-            </httpPlatform>
-          </system.webServer>
-        </configuration>
-        EOF
-
     - name: Create ZIP archive
       run: |
         cd deploy_package
@@ -80,6 +57,6 @@ jobs:
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
       with:
-        app-name: 'miapp-serpiente-game'
+        app-name: 'miapp-serpiente-game-linux'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ./deploy.zip
