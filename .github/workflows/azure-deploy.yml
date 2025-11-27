@@ -37,18 +37,26 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Create deployment package
+      run: |
+        mkdir deploy_package
+        cp -r www deploy_package/
+        cp -r app deploy_package/
+        cp requirements.txt deploy_package/
+        echo "gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind=0.0.0.0:8000" > deploy_package/startup.txt
+
     - name: Create .env file for production
       run: |
-        echo "HOST_DB=${{ secrets.HOST_DB }}" > app/.env
-        echo "ADMIN_DB=${{ secrets.ADMIN_DB }}" >> app/.env
-        echo "PASSWORD_DB=${{ secrets.PASSWORD_DB }}" >> app/.env
-        echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}" >> app/.env
-        echo "PORT_DB=${{ secrets.PORT_DB }}" >> app/.env
-        echo "DRIVER=${{ secrets.DRIVER }}" >> app/.env
+        echo "HOST_DB=${{ secrets.HOST_DB }}" > deploy_package/app/.env
+        echo "ADMIN_DB=${{ secrets.ADMIN_DB }}" >> deploy_package/app/.env
+        echo "PASSWORD_DB=${{ secrets.PASSWORD_DB }}" >> deploy_package/app/.env
+        echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}" >> deploy_package/app/.env
+        echo "PORT_DB=${{ secrets.PORT_DB }}" >> deploy_package/app/.env
+        echo "DRIVER=${{ secrets.DRIVER }}" >> deploy_package/app/.env
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
       with:
         app-name: 'miapp-serpiente-game'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: .
+        package: ./deploy_package
