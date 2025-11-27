@@ -1,20 +1,96 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-title>
-      Blank
+      Juego de la Serpiente
     </ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/scores" fill="clear">
+        <span class="trophy-icon">🏆</span>
+        Scores
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Blank</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <div id="game-container">
+    <div class="score-board">
+      <h2>Puntuación: {{ score }}</h2>
+    </div>
 
-  <div id="container">
-    <strong>Ready to create an app?</strong>
-    <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
+    <div class="game-area">
+      <canvas 
+        #gameCanvas 
+        [width]="400" 
+        [height]="400"
+        class="game-canvas">
+      </canvas>
+      
+      <div *ngIf="gameOver" class="game-over">
+        <h2>¡Game Over!</h2>
+        <p>Puntuación final: {{ score }}</p>
+      </div>
+      
+      <div *ngIf="!gameStarted" class="start-screen">
+        <h2>Juego de la Serpiente</h2>
+        <p>Usa las flechas del teclado o los botones para moverte</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <ion-button 
+        *ngIf="!gameStarted || gameOver" 
+        expand="block" 
+        (click)="startGame()">
+        {{ gameOver ? 'Jugar de Nuevo' : 'Iniciar Juego' }}
+      </ion-button>
+      
+      <div class="direction-controls" *ngIf="gameStarted && !gameOver">
+        <div class="control-row">
+          <ion-button (click)="changeDirection('UP')" fill="outline">
+            ↑
+          </ion-button>
+        </div>
+        <div class="control-row">
+          <ion-button (click)="changeDirection('LEFT')" fill="outline">
+            ←
+          </ion-button>
+          <ion-button (click)="changeDirection('DOWN')" fill="outline">
+            ↓
+          </ion-button>
+          <ion-button (click)="changeDirection('RIGHT')" fill="outline">
+            →
+          </ion-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de mejores puntuaciones -->
+    <div class="leaderboard" *ngIf="topScores.length > 0">
+      <h3>🏆 Mejores Puntuaciones</h3>
+      <div class="scores-table">
+        <div class="score-row header">
+          <span class="rank">#</span>
+          <span class="player">Jugador</span>
+          <span class="points">Puntos</span>
+        </div>
+        <div class="score-row" *ngFor="let score of topScores; let i = index" 
+             [class.top-1]="i === 0" 
+             [class.top-2]="i === 1" 
+             [class.top-3]="i === 2">
+          <span class="rank">{{ i + 1 }}</span>
+          <span class="player">{{ score.PlayerName }}</span>
+          <span class="points">{{ score.Score }}</span>
+        </div>
+      </div>
+      
+      <ion-button 
+        expand="block" 
+        fill="outline" 
+        routerLink="/scores"
+        class="view-all-button">
+        Ver Todos los Scores 📊
+      </ion-button>
+    </div>
   </div>
 </ion-content>

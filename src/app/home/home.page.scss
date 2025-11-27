@@ -1,27 +1,245 @@
-#container {
+ion-toolbar {
+  ion-buttons {
+    ion-button {
+      font-weight: 600;
+      
+      .trophy-icon {
+        font-size: 20px;
+        margin-right: 4px;
+      }
+    }
+  }
+}
+
+#game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 20px;
+}
+
+.score-board {
+  margin-bottom: 20px;
   text-align: center;
 
+  h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--ion-color-primary);
+  }
+}
+
+.game-area {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.game-canvas {
+  border: 2px solid var(--ion-color-primary);
+  border-radius: 8px;
+  background-color: #1e1e1e;
+  display: block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.game-over,
+.start-screen {
   position: absolute;
+  top: 0;
   left: 0;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.85);
+  border-radius: 8px;
+  color: white;
+  text-align: center;
+  padding: 20px;
+
+  h2 {
+    margin: 0 0 10px 0;
+    font-size: 32px;
+    font-weight: bold;
+  }
+
+  p {
+    margin: 0;
+    font-size: 18px;
+  }
 }
 
-#container strong {
-  font-size: 20px;
-  line-height: 26px;
+.controls {
+  width: 100%;
+  max-width: 400px;
+
+  ion-button {
+    margin-bottom: 10px;
+  }
 }
 
-#container p {
+.direction-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+
+  .control-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+
+    ion-button {
+      width: 60px;
+      height: 60px;
+      font-size: 24px;
+      margin: 0;
+    }
+  }
+}
+
+.leaderboard {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(33, 150, 243, 0.1));
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+  h3 {
+    text-align: center;
+    margin: 0 0 15px 0;
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--ion-color-primary);
+  }
+}
+
+.scores-table {
+  width: 100%;
+
+  .score-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 80px;
+    gap: 10px;
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+
+    &.header {
+      background-color: rgba(76, 175, 80, 0.2);
+      font-weight: bold;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    &:not(.header):hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      transform: translateX(5px);
+    }
+
+    &.top-1 {
+      background: linear-gradient(90deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.05));
+      border-left: 4px solid #FFD700;
+      
+      .rank::before {
+        content: '🥇 ';
+      }
+    }
+
+    &.top-2 {
+      background: linear-gradient(90deg, rgba(192, 192, 192, 0.2), rgba(192, 192, 192, 0.05));
+      border-left: 4px solid #C0C0C0;
+      
+      .rank::before {
+        content: '🥈 ';
+      }
+    }
+
+    &.top-3 {
+      background: linear-gradient(90deg, rgba(205, 127, 50, 0.2), rgba(205, 127, 50, 0.05));
+      border-left: 4px solid #CD7F32;
+      
+      .rank::before {
+        content: '🥉 ';
+      }
+    }
+
+    span {
+      display: flex;
+      align-items: center;
+    }
+
+    .rank {
+      justify-content: center;
+      font-weight: bold;
+      color: var(--ion-color-primary);
+    }
+
+    .player {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .points {
+      justify-content: flex-end;
+      font-weight: bold;
+      color: var(--ion-color-success);
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .game-canvas {
+    width: 100%;
+    max-width: 350px;
+    height: auto;
+  }
+
+  .score-board h2 {
+    font-size: 20px;
+  }
+
+  .direction-controls .control-row ion-button {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .leaderboard {
+    padding: 15px;
+    
+    h3 {
+      font-size: 18px;
+    }
+  }
+
+  .scores-table .score-row {
+    grid-template-columns: 35px 1fr 70px;
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .view-all-button {
+    font-size: 14px;
+    height: 40px;
+  }
+}
+
+.view-all-button {
+  margin-top: 20px;
+  font-weight: bold;
   font-size: 16px;
-  line-height: 22px;
-
-  color: #8c8c8c;
-
-  margin: 0;
-}
-
-#container a {
-  text-decoration: none;
+  height: 48px;
 }

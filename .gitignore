@@ -68,3 +68,27 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# FastAPI
+.pytest_cache/

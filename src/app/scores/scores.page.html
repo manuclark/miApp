@@ -1,0 +1,125 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Tabla de Puntuaciones</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="scores-container">
+    <!-- Estadísticas Generales -->
+    <ion-card class="stats-card">
+      <ion-card-header>
+        <ion-card-title>📊 Estadísticas</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value">{{ allScores.length }}</div>
+            <div class="stat-label">Partidas</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ topScores[0]?.Score || 0 }}</div>
+            <div class="stat-label">Mejor Score</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ topScores[0]?.PlayerName || '-' }}</div>
+            <div class="stat-label">Líder</div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Top 10 -->
+    <ion-card class="top-scores-card">
+      <ion-card-header>
+        <ion-card-title>🏆 Top 10 Mejores Scores</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list *ngIf="!loading; else loadingSpinner" lines="full">
+          <ion-item 
+            *ngFor="let score of topScores; let i = index"
+            [class.champion]="i === 0"
+            [class.silver]="i === 1"
+            [class.bronze]="i === 2">
+            <ion-label>
+              <h2>
+                <span class="rank-badge">{{ getMedalEmoji(i) }} #{{ i + 1 }}</span>
+                {{ score.PlayerName }}
+              </h2>
+              <p>{{ formatDate(score.GameDate) }}</p>
+            </ion-label>
+            <ion-badge slot="end" [color]="getScoreColor(score.Score)">
+              {{ score.Score }} pts
+            </ion-badge>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Buscador -->
+    <ion-card class="search-card">
+      <ion-card-header>
+        <ion-card-title>🔍 Buscar Jugador</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-searchbar
+          [(ngModel)]="searchTerm"
+          (ionInput)="filterScores($event)"
+          placeholder="Buscar por nombre..."
+          animated="true"
+          showClearButton="focus">
+        </ion-searchbar>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Todos los Scores -->
+    <ion-card class="all-scores-card">
+      <ion-card-header>
+        <ion-card-title>
+          📋 Todos los Scores 
+          <span class="count-badge">({{ filteredScores.length }})</span>
+        </ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list *ngIf="!loading; else loadingSpinner" lines="full">
+          <ion-item *ngFor="let score of filteredScores; let i = index">
+            <ion-label>
+              <h3>
+                <span class="position-number">#{{ i + 1 }}</span>
+                {{ score.PlayerName }}
+              </h3>
+              <p>{{ formatDate(score.GameDate) }}</p>
+            </ion-label>
+            <ion-badge slot="end" [color]="getScoreColor(score.Score)">
+              {{ score.Score }}
+            </ion-badge>
+          </ion-item>
+          
+          <div *ngIf="filteredScores.length === 0" class="no-results">
+            <p>No se encontraron resultados para "{{ searchTerm }}"</p>
+          </div>
+        </ion-list>
+
+        <ng-template #loadingSpinner>
+          <div class="loading-container">
+            <ion-spinner name="crescent"></ion-spinner>
+            <p>Cargando scores...</p>
+          </div>
+        </ng-template>
+      </ion-card-content>
+    </ion-card>
+
+    <div class="back-to-game">
+      <ion-button expand="block" routerLink="/home" color="primary">
+        🎮 Volver al Juego
+      </ion-button>
+    </div>
+  </div>
+</ion-content>

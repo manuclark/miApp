@@ -1,0 +1,269 @@
+.scores-container {
+  padding: 16px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+// Tarjeta de Estadísticas
+.stats-card {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(33, 150, 243, 0.1));
+  
+  ion-card-title {
+    font-size: 20px;
+    font-weight: bold;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 10px;
+
+    .stat-item {
+      text-align: center;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--ion-color-primary);
+        margin-bottom: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: var(--ion-color-medium);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+    }
+  }
+}
+
+// Tarjeta Top 10
+.top-scores-card {
+  ion-card-title {
+    font-size: 20px;
+    font-weight: bold;
+  }
+
+  ion-item {
+    --padding-start: 16px;
+    --padding-end: 16px;
+    --min-height: 60px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      --background: rgba(255, 255, 255, 0.05);
+    }
+
+    &.champion {
+      --background: linear-gradient(90deg, rgba(255, 215, 0, 0.15), rgba(255, 215, 0, 0.02));
+      border-left: 4px solid #FFD700;
+      font-weight: bold;
+    }
+
+    &.silver {
+      --background: linear-gradient(90deg, rgba(192, 192, 192, 0.15), rgba(192, 192, 192, 0.02));
+      border-left: 4px solid #C0C0C0;
+    }
+
+    &.bronze {
+      --background: linear-gradient(90deg, rgba(205, 127, 50, 0.15), rgba(205, 127, 50, 0.02));
+      border-left: 4px solid #CD7F32;
+    }
+
+    ion-label {
+      h2 {
+        font-size: 16px;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      p {
+        font-size: 12px;
+        color: var(--ion-color-medium);
+      }
+    }
+
+    .rank-badge {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    ion-badge {
+      font-size: 14px;
+      padding: 8px 12px;
+      font-weight: bold;
+    }
+  }
+}
+
+// Tarjeta de Búsqueda
+.search-card {
+  ion-card-title {
+    font-size: 18px;
+  }
+
+  ion-searchbar {
+    --background: rgba(255, 255, 255, 0.05);
+    --border-radius: 8px;
+    padding: 0;
+  }
+}
+
+// Tarjeta de Todos los Scores
+.all-scores-card {
+  ion-card-title {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .count-badge {
+      font-size: 14px;
+      color: var(--ion-color-medium);
+      font-weight: normal;
+    }
+  }
+
+  ion-item {
+    --padding-start: 16px;
+    --padding-end: 16px;
+    --min-height: 56px;
+
+    &:hover {
+      --background: rgba(255, 255, 255, 0.03);
+    }
+
+    ion-label {
+      h3 {
+        font-size: 15px;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .position-number {
+          color: var(--ion-color-medium);
+          font-weight: bold;
+          min-width: 40px;
+        }
+      }
+
+      p {
+        font-size: 11px;
+        color: var(--ion-color-medium);
+      }
+    }
+
+    ion-badge {
+      font-size: 13px;
+      padding: 6px 10px;
+    }
+  }
+
+  .no-results {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--ion-color-medium);
+    font-style: italic;
+
+    p {
+      margin: 0;
+    }
+  }
+}
+
+// Loading
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 16px;
+
+  ion-spinner {
+    width: 40px;
+    height: 40px;
+  }
+
+  p {
+    color: var(--ion-color-medium);
+    margin: 0;
+  }
+}
+
+// Botón de volver
+.back-to-game {
+  margin-top: 24px;
+  margin-bottom: 24px;
+
+  ion-button {
+    font-size: 16px;
+    font-weight: bold;
+    height: 50px;
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .scores-container {
+    padding: 12px;
+  }
+
+  .stats-card .stats-grid {
+    gap: 8px;
+
+    .stat-item {
+      padding: 8px;
+
+      .stat-value {
+        font-size: 20px;
+      }
+
+      .stat-label {
+        font-size: 10px;
+      }
+    }
+  }
+
+  .top-scores-card ion-item {
+    --min-height: 56px;
+
+    ion-label h2 {
+      font-size: 14px;
+    }
+
+    ion-badge {
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+  }
+
+  .all-scores-card ion-item {
+    --min-height: 52px;
+
+    ion-label h3 {
+      font-size: 14px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-card .stats-grid {
+    grid-template-columns: 1fr;
+
+    .stat-item .stat-value {
+      font-size: 28px;
+    }
+  }
+}
