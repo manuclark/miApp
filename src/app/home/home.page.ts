@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef } fr
 import { IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons } from '@ionic/angular/standalone';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { AlertController } from '@ionic/angular';
+import { AlertController } from '@ionic/angular/standalone';
 import { SnakeScoreService, SnakeScore } from '../services/snake-score.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpClientModule } from '@angular/common/http';
