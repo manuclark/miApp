@@ -1,0 +1,81 @@
+name: Deploy to EC2 (Develop)
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: |
+          npm run build -- --configuration production
+          ls -la www/ || echo "www directory not found"
+
+      - name: Build Docker image
+        run: |
+          docker build -t miapp-develop:${{ github.sha }} .
+          docker tag miapp-develop:${{ github.sha }} miapp-develop:latest
+
+      - name: Save Docker image
+        run: docker save miapp-develop:latest | gzip > miapp-develop.tar.gz
+
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "miapp-develop.tar.gz"
+          target: "/home/ubuntu/"
+
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Load Docker image
+            docker load < /home/ubuntu/miapp-develop.tar.gz
+            
+            # Stop and remove existing develop container
+            docker stop miapp-develop || true
+            docker rm miapp-develop || true
+            
+            # Run new container on port 8080
+            docker run -d \
+              --name miapp-develop \
+              --restart unless-stopped \
+              -p 8080:80 \
+              miapp-develop:latest
+            
+            # Clean up
+            rm /home/ubuntu/miapp-develop.tar.gz
+            docker image prune -f
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker ps | grep miapp-develop
+            echo "Develop application deployed successfully on port 8080!"
