@@ -5,7 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build outputs
-www/
+# www/ - needed for Docker build
 dist/
 .angular/
 *.js.map
