@@ -24,7 +24,9 @@ jobs:
         run: npm ci
 
       - name: Build application
-        run: npm run build
+        run: |
+          npm run build -- --configuration production
+          ls -la www/ || echo "www directory not found"
 
       - name: Build Docker image
         run: |
