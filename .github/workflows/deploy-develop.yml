@@ -59,11 +59,11 @@ jobs:
             docker stop miapp-develop || true
             docker rm miapp-develop || true
             
-            # Run new container on port 8080
+            # Run new container on port 8082
             docker run -d \
               --name miapp-develop \
               --restart unless-stopped \
-              -p 8080:80 \
+              -p 8082:80 \
               miapp-develop:latest
             
             # Clean up

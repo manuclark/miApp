@@ -63,7 +63,7 @@ jobs:
             docker run -d \
               --name miapp \
               --restart unless-stopped \
-              -p 80:80 \
+              -p 8081:80 \
               miapp:latest
             
             # Clean up
