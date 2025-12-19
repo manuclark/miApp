@@ -92,3 +92,5 @@ ENV/
 
 # FastAPI
 .pytest_cache/
+
+keys/
