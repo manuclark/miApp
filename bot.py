@@ -14,7 +14,7 @@ from typing import List, Dict, Optional, Union, Any
 load_dotenv()
 
 # Configuración
-FASTAPI_BASE_URL = "http://localhost:8000"
+FASTAPI_BASE_URL = "https://gasper-inc.com/mcp"
 API_KEY = os.getenv("KEY_API_AZURE")
 API_ENDPOINT = os.getenv("URL_API_AZURE")
 API_VERSION = os.getenv("API_VERSION", "2024-12-01-preview")
@@ -96,7 +96,7 @@ class MCPChatBot:
             })
             
             response = requests.post(
-                f"{FASTAPI_BASE_URL}/mcp",
+                FASTAPI_BASE_URL,
                 json=request,
                 timeout=5
             )
@@ -122,7 +122,7 @@ class MCPChatBot:
                 # Usar JSON-RPC 2.0
                 request = self._jsonrpc_request("tools/list")
                 response = requests.post(
-                    f"{FASTAPI_BASE_URL}/mcp",
+                    FASTAPI_BASE_URL,
                     json=request,
                     timeout=5
                 )
@@ -175,7 +175,7 @@ class MCPChatBot:
                 })
                 
                 response = requests.post(
-                    f"{FASTAPI_BASE_URL}/mcp",
+                    FASTAPI_BASE_URL,
                     json=request,
                     timeout=10
                 )

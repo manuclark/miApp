@@ -15,8 +15,8 @@ from contextlib import asynccontextmanager
 # Cargar variables de entorno
 load_dotenv()
 
-# Versión del protocolo MCP
-MCP_PROTOCOL_VERSION = "2025-06-18"
+# Versión del protocolo MCP (Copilot Studio requiere 2024-11-05)
+MCP_PROTOCOL_VERSION = "2024-11-05"
 
 # Versiones compatibles del protocolo
 COMPATIBLE_MCP_VERSIONS = ["2024-11-05", "2025-06-18"]
