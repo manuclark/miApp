@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 import pyodbc
 import os
@@ -14,6 +14,12 @@ from contextlib import asynccontextmanager
 
 # Cargar variables de entorno
 load_dotenv()
+
+# Versión del protocolo MCP
+MCP_PROTOCOL_VERSION = "2025-06-18"
+
+# Versiones compatibles del protocolo
+COMPATIBLE_MCP_VERSIONS = ["2024-11-05", "2025-06-18"]
 
 # Obtener configuración de base de datos desde .env
 HOST_DB = os.getenv("HOST_DB")
@@ -113,8 +119,28 @@ class SnakeScoreResponse(BaseModel):
 
 
 # ============================================================
-# Modelos Pydantic para MCP Tools
+# Modelos Pydantic para MCP Tools (JSON-RPC 2.0)
 # ============================================================
+
+class JSONRPCRequest(BaseModel):
+    jsonrpc: str = "2.0"
+    method: str
+    params: Optional[Dict[str, Any]] = None
+    id: Optional[Union[str, int]] = None
+
+
+class JSONRPCError(BaseModel):
+    code: int
+    message: str
+    data: Optional[Any] = None
+
+
+class JSONRPCResponse(BaseModel):
+    jsonrpc: str = "2.0"
+    result: Optional[Any] = None
+    error: Optional[JSONRPCError] = None
+    id: Optional[Union[str, int]] = None
+
 
 class MCPToolCall(BaseModel):
     tool_name: str
@@ -147,107 +173,132 @@ async def api_root():
 
 
 # ============================================================
-# Endpoints para MCP Tools (Compatible con GPT 5.2)
+# Endpoints para MCP Tools (JSON-RPC 2.0)
 # ============================================================
 
-@app.get("/api/mcp/tools")
-async def list_mcp_tools():
+@app.post("/mcp")
+async def mcp_jsonrpc_handler(request: JSONRPCRequest):
     """
-    Lista todas las herramientas MCP disponibles.
-    Compatible con GPT 5.2 function calling.
+    Manejador principal de JSON-RPC 2.0 para MCP.
+    Soporta los métodos estándar de MCP.
     """
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_user_demo",
-                "description": "Obtiene datos de demostración de un usuario. Retorna información de perfil con email benito@gmail.com, nombre, estadísticas y preferencias.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "include_details": {
-                            "type": "boolean",
-                            "description": "Si es true, incluye detalles adicionales del usuario como estadísticas, preferencias y fechas",
-                            "default": True
+    try:
+        method = request.method
+        params = request.params or {}
+        request_id = request.id
+        
+        # Método: initialize
+        if method == "initialize":
+            return JSONRPCResponse(
+                result={
+                    "protocolVersion": MCP_PROTOCOL_VERSION,
+                    "serverInfo": {
+                        "name": "miApp MCP Server",
+                        "version": "1.0.0"
+                    },
+                    "capabilities": {
+                        "tools": {},
+                        "resources": {}
+                    }
+                },
+                id=request_id
+            )
+        
+        # Método: tools/list
+        elif method == "tools/list":
+            tools = [
+                {
+                    "name": "get_user_demo",
+                    "description": "Obtiene datos de demostración de un usuario. Retorna información de perfil con email benito@gmail.com, nombre, estadísticas y preferencias.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "include_details": {
+                                "type": "boolean",
+                                "description": "Si es true, incluye detalles adicionales del usuario como estadísticas, preferencias y fechas",
+                                "default": True
+                            }
                         }
                     }
                 }
-            }
-        }
-    ]
-    
-    return {
-        "success": True,
-        "tools": tools,
-        "count": len(tools)
-    }
-
-
-@app.post("/api/mcp/call-tool", response_model=MCPToolResponse)
-async def call_mcp_tool(tool_call: MCPToolCall):
-    """
-    Ejecuta una herramienta MCP específica.
-    Compatible con GPT 5.2 function calling.
-    
-    Ejemplo de uso:
-    POST /api/mcp/call-tool
-    {
-        "tool_name": "get_user_demo",
-        "arguments": {"include_details": true}
-    }
-    """
-    try:
-        tool_name = tool_call.tool_name
-        arguments = tool_call.arguments or {}
-        
-        if tool_name == "get_user_demo":
-            # Ejecutar el tool get_user_demo
-            include_details = arguments.get("include_details", True)
+            ]
             
-            user_data = {
-                "email": "benito@gmail.com",
-                "name": "Benito Martínez",
-                "username": "benito_m",
-                "id": "usr_12345",
-                "status": "active"
-            }
-            
-            # Agregar detalles adicionales si se solicitan
-            if include_details:
-                user_data.update({
-                    "created_at": "2024-01-15T10:30:00Z",
-                    "last_login": "2025-12-23T08:15:30Z",
-                    "role": "premium_user",
-                    "preferences": {
-                        "language": "es",
-                        "notifications": True,
-                        "theme": "dark"
-                    },
-                    "stats": {
-                        "total_games": 42,
-                        "high_score": 1250,
-                        "achievements": 15
-                    }
-                })
-            
-            return MCPToolResponse(
-                success=True,
-                result=user_data,
-                error=None
+            return JSONRPCResponse(
+                result={"tools": tools},
+                id=request_id
             )
         
+        # Método: tools/call
+        elif method == "tools/call":
+            tool_name = params.get("name")
+            arguments = params.get("arguments", {})
+            
+            if tool_name == "get_user_demo":
+                include_details = arguments.get("include_details", True)
+                
+                user_data = {
+                    "email": "benito@gmail.com",
+                    "name": "Benito Martínez",
+                    "username": "benito_m",
+                    "id": "usr_12345",
+                    "status": "active"
+                }
+                
+                if include_details:
+                    user_data.update({
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "last_login": "2025-12-23T08:15:30Z",
+                        "role": "premium_user",
+                        "preferences": {
+                            "language": "es",
+                            "notifications": True,
+                            "theme": "dark"
+                        },
+                        "stats": {
+                            "total_games": 42,
+                            "high_score": 1250,
+                            "achievements": 15
+                        }
+                    })
+                
+                return JSONRPCResponse(
+                    result={
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps(user_data, indent=2, ensure_ascii=False)
+                            }
+                        ]
+                    },
+                    id=request_id
+                )
+            else:
+                return JSONRPCResponse(
+                    error=JSONRPCError(
+                        code=-32602,
+                        message=f"Herramienta desconocida: {tool_name}"
+                    ),
+                    id=request_id
+                )
+        
+        # Método desconocido
         else:
-            return MCPToolResponse(
-                success=False,
-                result=None,
-                error=f"Herramienta desconocida: {tool_name}"
+            return JSONRPCResponse(
+                error=JSONRPCError(
+                    code=-32601,
+                    message=f"Método no encontrado: {method}"
+                ),
+                id=request_id
             )
             
     except Exception as e:
-        return MCPToolResponse(
-            success=False,
-            result=None,
-            error=str(e)
+        return JSONRPCResponse(
+            error=JSONRPCError(
+                code=-32603,
+                message="Error interno del servidor",
+                data=str(e)
+            ),
+            id=request.id
         )
 
 

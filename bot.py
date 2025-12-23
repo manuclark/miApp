@@ -8,7 +8,7 @@ import json
 import requests
 from openai import AzureOpenAI
 from dotenv import load_dotenv
-from typing import List, Dict
+from typing import List, Dict, Optional, Union, Any
 
 # Cargar variables de entorno
 load_dotenv()
@@ -20,11 +20,20 @@ API_ENDPOINT = os.getenv("URL_API_AZURE")
 API_VERSION = os.getenv("API_VERSION", "2024-12-01-preview")
 DEPLOYMENT_NAME = os.getenv("DEPLOYMENT_NAME", "gpt-5.2")
 
+# Versión del protocolo MCP
+MCP_PROTOCOL_VERSION = "2025-06-18"
+
+# Versiones compatibles del protocolo
+COMPATIBLE_MCP_VERSIONS = ["2024-11-05", "2025-06-18"]
+
+# Usar JSON-RPC 2.0 (True) o formato legacy (False)
+USE_JSONRPC = True
+
 
 class MCPChatBot:
     """Bot de chat con GPT 5.2 y herramientas MCP"""
     
-    def __init__(self):
+    def __init__(self, use_jsonrpc: bool = USE_JSONRPC):
         """Inicializar el bot"""
         self.client = AzureOpenAI(
             api_key=API_KEY,
@@ -34,9 +43,16 @@ class MCPChatBot:
         self.messages: List[Dict] = []
         self.tools = []
         self.conversation_active = True
+        self.use_jsonrpc = use_jsonrpc
+        self.jsonrpc_id = 0
         
         # Inicializar sistema
         self._setup_system()
+        
+        # Inicializar servidor MCP con JSON-RPC si está habilitado
+        if self.use_jsonrpc:
+            self._initialize_mcp_server()
+        
         self._load_mcp_tools()
     
     def _setup_system(self):
@@ -52,18 +68,98 @@ class MCPChatBot:
         }
         self.messages.append(system_message)
     
+    def _get_next_jsonrpc_id(self) -> int:
+        """Obtener el siguiente ID para JSON-RPC"""
+        self.jsonrpc_id += 1
+        return self.jsonrpc_id
+    
+    def _jsonrpc_request(self, method: str, params: Optional[Dict] = None) -> Dict:
+        """Crear una petición JSON-RPC 2.0"""
+        request = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "id": self._get_next_jsonrpc_id()
+        }
+        if params:
+            request["params"] = params
+        return request
+    
+    def _initialize_mcp_server(self):
+        """Inicializar el servidor MCP usando JSON-RPC"""
+        try:
+            request = self._jsonrpc_request("initialize", {
+                "protocolVersion": MCP_PROTOCOL_VERSION,
+                "clientInfo": {
+                    "name": "MCPChatBot",
+                    "version": "1.0.0"
+                }
+            })
+            
+            response = requests.post(
+                f"{FASTAPI_BASE_URL}/mcp",
+                json=request,
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "result" in data:
+                    server_info = data["result"]
+                    print(f"✅ Servidor MCP inicializado: {server_info.get('serverInfo', {}).get('name', 'Unknown')}")
+                    print(f"   Versión del protocolo: {server_info.get('protocolVersion', 'Unknown')}")
+                else:
+                    print(f"⚠️  Error en initialize: {data.get('error', {}).get('message', 'Unknown')}")
+            else:
+                print(f"⚠️  No se pudo inicializar MCP: HTTP {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️  Error al inicializar servidor MCP: {e}")
+    
     def _load_mcp_tools(self):
         """Cargar herramientas MCP desde el servidor"""
         try:
-            response = requests.get(f"{FASTAPI_BASE_URL}/api/mcp/tools", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                self.tools = data["tools"]
-                print(f"✅ {len(self.tools)} herramientas MCP cargadas")
-                for tool in self.tools:
-                    print(f"   📌 {tool['function']['name']}")
+            if self.use_jsonrpc:
+                # Usar JSON-RPC 2.0
+                request = self._jsonrpc_request("tools/list")
+                response = requests.post(
+                    f"{FASTAPI_BASE_URL}/mcp",
+                    json=request,
+                    timeout=5
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data and "tools" in data["result"]:
+                        # Convertir formato MCP a formato OpenAI
+                        mcp_tools = data["result"]["tools"]
+                        self.tools = []
+                        for tool in mcp_tools:
+                            self.tools.append({
+                                "type": "function",
+                                "function": {
+                                    "name": tool["name"],
+                                    "description": tool["description"],
+                                    "parameters": tool.get("inputSchema", {})
+                                }
+                            })
+                        print(f"✅ {len(self.tools)} herramientas MCP cargadas (JSON-RPC)")
+                        for tool in mcp_tools:
+                            print(f"   📌 {tool['name']}")
+                    else:
+                        print(f"⚠️  Error en tools/list: {data.get('error', {}).get('message', 'Unknown')}")
+                else:
+                    print(f"⚠️  No se pudieron cargar las herramientas MCP: {response.status_code}")
             else:
-                print(f"⚠️  No se pudieron cargar las herramientas MCP: {response.status_code}")
+                # Usar formato legacy
+                response = requests.get(f"{FASTAPI_BASE_URL}/api/mcp/tools", timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    self.tools = data["tools"]
+                    print(f"✅ {len(self.tools)} herramientas MCP cargadas (legacy)")
+                    for tool in self.tools:
+                        print(f"   📌 {tool['function']['name']}")
+                else:
+                    print(f"⚠️  No se pudieron cargar las herramientas MCP: {response.status_code}")
         except Exception as e:
             print(f"⚠️  Error al conectar con el servidor MCP: {e}")
             print("   El bot funcionará sin herramientas MCP")
@@ -71,21 +167,64 @@ class MCPChatBot:
     def _call_mcp_tool(self, tool_name: str, arguments: dict) -> dict:
         """Llamar a una herramienta MCP"""
         try:
-            response = requests.post(
-                f"{FASTAPI_BASE_URL}/api/mcp/call-tool",
-                json={
-                    "tool_name": tool_name,
+            if self.use_jsonrpc:
+                # Usar JSON-RPC 2.0
+                request = self._jsonrpc_request("tools/call", {
+                    "name": tool_name,
                     "arguments": arguments
-                },
-                timeout=10
-            )
-            if response.status_code == 200:
-                return response.json()
+                })
+                
+                response = requests.post(
+                    f"{FASTAPI_BASE_URL}/mcp",
+                    json=request,
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        # Extraer el contenido del resultado MCP
+                        result = data["result"]
+                        if "content" in result and len(result["content"]) > 0:
+                            # Parsear el JSON del contenido de texto
+                            content_text = result["content"][0].get("text", "{}")
+                            parsed_result = json.loads(content_text)
+                            return {
+                                "success": True,
+                                "result": parsed_result
+                            }
+                        return {
+                            "success": True,
+                            "result": result
+                        }
+                    else:
+                        error = data.get("error", {})
+                        return {
+                            "success": False,
+                            "error": error.get("message", "Unknown error")
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Error HTTP {response.status_code}"
+                    }
             else:
-                return {
-                    "success": False,
-                    "error": f"Error HTTP {response.status_code}"
-                }
+                # Usar formato legacy
+                response = requests.post(
+                    f"{FASTAPI_BASE_URL}/api/mcp/call-tool",
+                    json={
+                        "tool_name": tool_name,
+                        "arguments": arguments
+                    },
+                    timeout=10
+                )
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Error HTTP {response.status_code}"
+                    }
         except Exception as e:
             return {
                 "success": False,
@@ -234,6 +373,9 @@ class MCPChatBot:
         print("\n📝 Comandos disponibles:")
         print("   /salir     - Terminar la conversación")
         print("   /limpiar   - Limpiar historial de conversación")
+        print(f"✅ Protocolo: {'JSON-RPC 2.0' if self.use_jsonrpc else 'Legacy'}")
+        if self.use_jsonrpc:
+            print(f"✅ Versión MCP: {MCP_PROTOCOL_VERSION}")
         print("   /historial - Ver historial de mensajes")
         print("   /ayuda     - Mostrar esta ayuda")
         print("\n💡 Puedes preguntarme lo que quieras. Tengo acceso a herramientas MCP.")
