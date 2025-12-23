@@ -1,5 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -8,12 +8,20 @@ from datetime import datetime
 import pyodbc
 import os
 import json
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 
 # Cargar variables de entorno
 load_dotenv()
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Versión del protocolo MCP (Copilot Studio requiere 2024-11-05)
 MCP_PROTOCOL_VERSION = "2024-11-05"
@@ -176,19 +184,96 @@ async def api_root():
 # Endpoints para MCP Tools (JSON-RPC 2.0)
 # ============================================================
 
+@app.get("/mcp")
+async def mcp_info():
+    """Verificar que el endpoint MCP está activo"""
+    return {
+        "status": "ready",
+        "protocol": "MCP",
+        "version": MCP_PROTOCOL_VERSION,
+        "transport": "http"
+    }
+
+
 @app.post("/mcp")
-async def mcp_jsonrpc_handler(request: JSONRPCRequest):
+async def mcp_jsonrpc_handler(raw_request: Request):
     """
     Manejador principal de JSON-RPC 2.0 para MCP.
     Soporta los métodos estándar de MCP.
     """
+    req_body = None
     try:
-        method = request.method
-        params = request.params or {}
-        request_id = request.id
+        # Logging de headers para debugging
+        logger.info("=== MCP Request Headers ===")
+        for header_name, header_value in raw_request.headers.items():
+            if header_name.lower() == "authorization":
+                logger.info(f"  {header_name}: [REDACTED]")
+            else:
+                logger.info(f"  {header_name}: {header_value}")
+        
+        # Obtener el body JSON
+        req_body = await raw_request.json()
+        logger.info(f"MCP Request body: {json.dumps(req_body)}")
+        
+        # Validar estructura JSON-RPC
+        if not isinstance(req_body, dict):
+            return JSONRPCResponse(
+                error=JSONRPCError(
+                    code=-32600,
+                    message="Invalid Request: body must be a JSON object"
+                ),
+                id=None
+            )
+        
+        jsonrpc_version = req_body.get("jsonrpc")
+        method = req_body.get("method")
+        request_id = req_body.get("id")
+        params = req_body.get("params", {})
+        
+        # Validar versión JSON-RPC
+        if jsonrpc_version != "2.0":
+            return JSONRPCResponse(
+                error=JSONRPCError(
+                    code=-32600,
+                    message="Invalid Request: jsonrpc must be 2.0"
+                ),
+                id=request_id
+            )
+        
+        # Manejar respuestas del cliente (tienen id pero no method)
+        if not method and request_id is not None:
+            logger.info("Received response from client, returning 202 Accepted")
+            return Response(status_code=202)
+        
+        # Validar que tenga método
+        if not method:
+            return JSONRPCResponse(
+                error=JSONRPCError(
+                    code=-32600,
+                    message="Invalid Request: method is required"
+                ),
+                id=request_id
+            )
+        
+        logger.info(f"Processing method: {method}, id: {request_id}")
         
         # Método: initialize
         if method == "initialize":
+            client_version = params.get("protocolVersion", MCP_PROTOCOL_VERSION)
+            
+            # Validar versión del protocolo
+            if client_version not in COMPATIBLE_MCP_VERSIONS:
+                logger.warning(f"Incompatible protocol version: {client_version}")
+                return JSONRPCResponse(
+                    error=JSONRPCError(
+                        code=-32600,
+                        message=f"Unsupported protocol version: {client_version}",
+                        data={"supportedVersions": COMPATIBLE_MCP_VERSIONS}
+                    ),
+                    id=request_id
+                )
+            
+            logger.info(f"Initialize successful with version {client_version}")
             return JSONRPCResponse(
                 result={
                     "protocolVersion": MCP_PROTOCOL_VERSION,
@@ -204,6 +289,11 @@ async def mcp_jsonrpc_handler(request: JSONRPCRequest):
                 },
                 id=request_id
             )
+        
+        # Método: notifications/initialized
+        elif method == "notifications/initialized":
+            logger.info("Handling notifications/initialized - returning 202 Accepted")
+            return Response(status_code=202)
         
         # Método: tools/list
         elif method == "tools/list":
@@ -224,6 +314,7 @@ async def mcp_jsonrpc_handler(request: JSONRPCRequest):
                 }
             ]
             
+            logger.info(f"Returning {len(tools)} tools")
             return JSONRPCResponse(
                 result={"tools": tools},
                 id=request_id
@@ -233,6 +324,8 @@ async def mcp_jsonrpc_handler(request: JSONRPCRequest):
         elif method == "tools/call":
             tool_name = params.get("name")
             arguments = params.get("arguments", {})
+            
+            logger.info(f"Calling tool: {tool_name} with args: {arguments}")
             
             if tool_name == "get_user_demo":
                 include_details = arguments.get("include_details", True)
@@ -262,6 +355,7 @@ async def mcp_jsonrpc_handler(request: JSONRPCRequest):
                         }
                     })
                 
+                logger.info("Tool execution successful")
                 return JSONRPCResponse(
                     result={
                         "content": [
@@ -274,32 +368,44 @@ async def mcp_jsonrpc_handler(request: JSONRPCRequest):
                     id=request_id
                 )
             else:
+                logger.warning(f"Unknown tool: {tool_name}")
                 return JSONRPCResponse(
                     error=JSONRPCError(
                         code=-32602,
-                        message=f"Herramienta desconocida: {tool_name}"
+                        message=f"Unknown tool: {tool_name}"
                     ),
                     id=request_id
                 )
         
         # Método desconocido
         else:
+            logger.warning(f"Unknown method: {method}")
             return JSONRPCResponse(
                 error=JSONRPCError(
                     code=-32601,
-                    message=f"Método no encontrado: {method}"
+                    message=f"Method not found: {method}"
                 ),
                 id=request_id
             )
             
+    except json.JSONDecodeError:
+        logger.error("JSON parse error")
+        return JSONRPCResponse(
+            error=JSONRPCError(
+                code=-32700,
+                message="Parse error: Invalid JSON"
+            ),
+            id=None
+        )
     except Exception as e:
+        logger.error(f"Internal error: {str(e)}", exc_info=True)
         return JSONRPCResponse(
             error=JSONRPCError(
                 code=-32603,
-                message="Error interno del servidor",
+                message="Internal error",
                 data=str(e)
             ),
-            id=request.id
+            id=req_body.get("id") if req_body else None
         )
 
 
