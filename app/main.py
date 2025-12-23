@@ -197,8 +197,9 @@ async def mcp_jsonrpc_handler(request: JSONRPCRequest):
                         "version": "1.0.0"
                     },
                     "capabilities": {
-                        "tools": {},
-                        "resources": {}
+                        "tools": {
+                            "listChanged": False
+                        }
                     }
                 },
                 id=request_id
