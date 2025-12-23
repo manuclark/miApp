@@ -3,10 +3,11 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 import pyodbc
 import os
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
@@ -111,6 +112,21 @@ class SnakeScoreResponse(BaseModel):
     CreatedAt: str
 
 
+# ============================================================
+# Modelos Pydantic para MCP Tools
+# ============================================================
+
+class MCPToolCall(BaseModel):
+    tool_name: str
+    arguments: Optional[Dict[str, Any]] = None
+
+
+class MCPToolResponse(BaseModel):
+    success: bool
+    result: Any
+    error: Optional[str] = None
+
+
 @app.get("/api")
 async def api_root():
     """Endpoint raíz de la API"""
@@ -121,9 +137,118 @@ async def api_root():
             "health": "/health",
             "docs": "/docs",
             "redoc": "/redoc",
-            "api": "/api"
+            "api": "/api",
+            "mcp": {
+                "list_tools": "/api/mcp/tools",
+                "call_tool": "/api/mcp/call-tool"
+            }
         }
     }
+
+
+# ============================================================
+# Endpoints para MCP Tools (Compatible con GPT 5.2)
+# ============================================================
+
+@app.get("/api/mcp/tools")
+async def list_mcp_tools():
+    """
+    Lista todas las herramientas MCP disponibles.
+    Compatible con GPT 5.2 function calling.
+    """
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_user_demo",
+                "description": "Obtiene datos de demostración de un usuario. Retorna información de perfil con email benito@gmail.com, nombre, estadísticas y preferencias.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "include_details": {
+                            "type": "boolean",
+                            "description": "Si es true, incluye detalles adicionales del usuario como estadísticas, preferencias y fechas",
+                            "default": True
+                        }
+                    }
+                }
+            }
+        }
+    ]
+    
+    return {
+        "success": True,
+        "tools": tools,
+        "count": len(tools)
+    }
+
+
+@app.post("/api/mcp/call-tool", response_model=MCPToolResponse)
+async def call_mcp_tool(tool_call: MCPToolCall):
+    """
+    Ejecuta una herramienta MCP específica.
+    Compatible con GPT 5.2 function calling.
+    
+    Ejemplo de uso:
+    POST /api/mcp/call-tool
+    {
+        "tool_name": "get_user_demo",
+        "arguments": {"include_details": true}
+    }
+    """
+    try:
+        tool_name = tool_call.tool_name
+        arguments = tool_call.arguments or {}
+        
+        if tool_name == "get_user_demo":
+            # Ejecutar el tool get_user_demo
+            include_details = arguments.get("include_details", True)
+            
+            user_data = {
+                "email": "benito@gmail.com",
+                "name": "Benito Martínez",
+                "username": "benito_m",
+                "id": "usr_12345",
+                "status": "active"
+            }
+            
+            # Agregar detalles adicionales si se solicitan
+            if include_details:
+                user_data.update({
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "last_login": "2025-12-23T08:15:30Z",
+                    "role": "premium_user",
+                    "preferences": {
+                        "language": "es",
+                        "notifications": True,
+                        "theme": "dark"
+                    },
+                    "stats": {
+                        "total_games": 42,
+                        "high_score": 1250,
+                        "achievements": 15
+                    }
+                })
+            
+            return MCPToolResponse(
+                success=True,
+                result=user_data,
+                error=None
+            )
+        
+        else:
+            return MCPToolResponse(
+                success=False,
+                result=None,
+                error=f"Herramienta desconocida: {tool_name}"
+            )
+            
+    except Exception as e:
+        return MCPToolResponse(
+            success=False,
+            result=None,
+            error=str(e)
+        )
 
 
 @app.get("/")
